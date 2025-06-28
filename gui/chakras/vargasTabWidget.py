@@ -1,6 +1,7 @@
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QGroupBox, QLabel, QHBoxLayout
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QGroupBox, QLabel
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from logic.chakras import vargas
+
 
 class VargasTabWidget(QWidget):
     def __init__(self, astro_data):
@@ -17,28 +18,32 @@ class VargasTabWidget(QWidget):
         planets_raw = {k: v["degree"] for k, v in astro_data["planets"].items()}
 
         charts = {
-           "D1": vargas.get_d1_chart(astro_data),
-           "D3": vargas.get_d3_chart(planets_raw, asc_deg),
-           "D6": vargas.get_d6_chart(planets_raw, asc_deg),
-           "D9": vargas.get_d9_chart(planets_raw, asc_deg),
-           "D30": vargas.get_d30_chart(planets_raw, asc_deg),
-           "D60": vargas.get_d60_chart(planets_raw, asc_deg),
+            "D1": vargas.get_d1_chart(astro_data),
+            "D3": vargas.get_d3_chart(astro_data),
+            "D6": vargas.get_d6_chart(astro_data),
+            "D9": vargas.get_d9_chart(astro_data),
+            "D10": vargas.get_d10_chart(planets_raw, asc_deg),
+            "D12": vargas.get_d12_chart(planets_raw, asc_deg),
+            "D16": vargas.get_d16_chart(planets_raw, asc_deg),
+            "D20": vargas.get_d20_chart(planets_raw, asc_deg),
+            "D30": vargas.get_d30_chart(planets_raw, asc_deg),
+            "D40": vargas.get_d40_chart(planets_raw, asc_deg),
+            "D60": vargas.get_d60_chart(planets_raw, asc_deg),
         }
 
         def chart_to_svg(chart):
             svg = '<svg viewBox="-120 -120 240 240" width="450" height="450">'
             svg += """
-            <rect x="-100" y="-100" width="200" height="200" fill="white" stroke="black"/>
-            <line x1="-100" y1="-100" x2="100" y2="100" stroke="black"/>
-            <line x1="100" y1="-100" x2="-100" y2="100" stroke="black"/>
-            <line x1="0" y1="-100" x2="100" y2="0" stroke="black"/>
-            <line x1="100" y1="0" x2="0" y2="100" stroke="black"/>
-            <line x1="0" y1="100" x2="-100" y2="0" stroke="black"/>
-            <line x1="-100" y1="0" x2="0" y2="-100" stroke="black"/>
+                <rect x="-100" y="-100" width="200" height="200" fill="white" stroke="black"/>
+                <line x1="-100" y1="-100" x2="100" y2="100" stroke="black"/>
+                <line x1="100" y1="-100" x2="-100" y2="100" stroke="black"/>
+                <line x1="0" y1="-100" x2="100" y2="0" stroke="black"/>
+                <line x1="100" y1="0" x2="0" y2="100" stroke="black"/>
+                <line x1="0" y1="100" x2="-100" y2="0" stroke="black"/>
+                <line x1="-100" y1="0" x2="0" y2="-100" stroke="black"/>
             """
-
             positions = {
-                1:  (0, 55), 2: (-50, 80), 3: (-80, 50), 4: (-60, 0),
+                1: (0, 55), 2: (-50, 80), 3: (-80, 50), 4: (-60, 0),
                 5: (-80, -45), 6: (-50, -85), 7: (0, -40), 8: (60, -80),
                 9: (90, -50), 10: (40, 0), 11: (80, 50), 12: (55, 80)
             }
@@ -49,8 +54,9 @@ class VargasTabWidget(QWidget):
                 planets = chart[house]['planets']
                 zodiac = chart[house]['zodiac']
                 for i, p in enumerate(planets):
-                    svg += f'<text x="{x}" y="{y + i*9 - 6}" font-size="8" fill="darkred" text-anchor="middle">{p}</text>'
-                svg += f'<text x="{x}" y="{y + len(planets)*9 + 4}" font-size="7" fill="black" text-anchor="middle">{zodiac}</text>'
+                    svg += f'<text x="{x}" y="{y + i * 9 - 6}" font-size="8" fill="darkred" text-anchor="middle">{p}</text>'
+                svg += f'<text x="{x}" y="{y + len(planets) * 9 + 4}" font-size="7" fill="black" text-anchor="middle">{zodiac}</text>'
+
             svg += '</svg>'
             return svg
 
@@ -68,7 +74,7 @@ class VargasTabWidget(QWidget):
         return html
 
 
-# ✅ REUSABLE FUNCTION for other tabs like Basics
+# ✅ Reusable function to embed in BasicsTab etc.
 def create_chart_group_box(astro_data):
     from PyQt5.QtWebEngineWidgets import QWebEngineView
     from PyQt5.QtWidgets import QVBoxLayout

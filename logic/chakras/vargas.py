@@ -15,18 +15,14 @@ PLANET_SHORT = {
 
 def to_float(value):
     try:
-        if isinstance(value, list):
-            value = value[0]
-        return float(value)
+        return float(value[0]) if isinstance(value, list) else float(value)
     except:
         return 0.0
 
 
 def get_sign_and_degree(abs_deg):
     abs_deg = to_float(abs_deg)
-    sign = int(abs_deg // 30)
-    deg = abs_deg % 30
-    return sign, deg
+    return int(abs_deg // 30), abs_deg % 30
 
 
 def rotate_chart(mapping, asc_house):
@@ -36,35 +32,23 @@ def rotate_chart(mapping, asc_house):
             continue
         short = PLANET_SHORT.get(body, body[:2])
         shift = (house - asc_house) % 12
-        new_house = shift + 1
-        rotated[new_house]['planets'].append(short)
-
+        rotated[shift + 1]['planets'].append(short)
     for i in range(1, 13):
         zodiac_index = (asc_house - 1 + i - 1) % 12
         rotated[i]['zodiac'] = ZODIAC_SIGNS[zodiac_index] + f" ({zodiac_index + 1})"
-
     return rotated
 
 
 def get_d1_chart(astro_data):
-    zodiac_index = lambda z: ZODIAC_SIGNS.index(z[:3])
-    asc_zodiac = astro_data['ascendant']['zodiac'][:3]
-    asc_index = zodiac_index(asc_zodiac)
+    def zodiac_index(z): return ZODIAC_SIGNS.index(z[:3])
+    asc_index = zodiac_index(astro_data['ascendant']['zodiac'])
 
     chart = {i: {"zodiac": "", "planets": []} for i in range(1, 13)}
-
     for i in range(12):
-        house_num = i + 1
-        zodiac_num = (asc_index + i) % 12
-        chart[house_num]["zodiac"] = ZODIAC_SIGNS[zodiac_num] + f" ({zodiac_num + 1})"
-
+        chart[i + 1]["zodiac"] = ZODIAC_SIGNS[(asc_index + i) % 12] + f" ({(asc_index + i) % 12 + 1})"
     for planet, pdata in astro_data["planets"].items():
-        zodiac = pdata["zodiac"][:3]
-        zodiac_idx = zodiac_index(zodiac)
-        house_pos = (zodiac_idx - asc_index) % 12 + 1
-        short = PLANET_SHORT.get(planet, planet[:2])
-        chart[house_pos]["planets"].append(short)
-
+        house = ((zodiac_index(pdata["zodiac"]) - asc_index + 12) % 12) + 1
+        chart[house]["planets"].append(PLANET_SHORT.get(planet, planet[:2]))
     chart[1]["planets"].insert(0, "As")
     return chart
 
@@ -78,9 +62,12 @@ def generic_chart(planets_raw, asc_deg, transform_fn):
     return rotate_chart(chart, asc_sign_index)
 
 
-def get_d3_chart(planets_raw, asc_deg):
-    def drekkana_transform(abs_deg):
-        sign, deg = get_sign_and_degree(abs_deg)
+# 🔢 Individual Divisional Charts
+
+def get_d3_chart(astro_data):
+    def zodiac_index(z): return ZODIAC_SIGNS.index(z[:3])
+
+    def drekkana_zodiac(sign, deg):
         if deg < 10:
             return sign
         elif deg < 20:
@@ -88,103 +75,168 @@ def get_d3_chart(planets_raw, asc_deg):
         else:
             return (sign + 8) % 12
 
-    asc_deg = to_float(asc_deg)
-    asc_sign = drekkana_transform(asc_deg)
+    asc_sign = zodiac_index(astro_data['ascendant']['zodiac'])
+    asc_deg = to_float(astro_data['ascendant']['degree'])
+    asc_drekkana = drekkana_zodiac(asc_sign, asc_deg)
 
     chart = {i: {"zodiac": "", "planets": []} for i in range(1, 13)}
-    for planet, abs_deg in planets_raw.items():
+    for i in range(12):
+        sign_num = (asc_drekkana + i) % 12
+        chart[i + 1]["zodiac"] = ZODIAC_SIGNS[sign_num] + f" ({sign_num + 1})"
+
+    for planet, pdata in astro_data["planets"].items():
         if planet == "Ascendant":
             continue
-        transformed = drekkana_transform(to_float(abs_deg))
-        house = ((transformed - asc_sign + 12) % 12) + 1
+        sign = zodiac_index(pdata["zodiac"])
+        deg = to_float(pdata["degree"])
+        drekkana_sign = drekkana_zodiac(sign, deg)
+        house = ((drekkana_sign - asc_drekkana + 12) % 12) + 1
         chart[house]["planets"].append(PLANET_SHORT.get(planet, planet[:2]))
 
     chart[1]["planets"].insert(0, "As")
-    for i in range(1, 13):
-        chart[i]["zodiac"] = ZODIAC_SIGNS[(asc_sign + i - 1) % 12] + f" ({(asc_sign + i - 1) % 12 + 1})"
-
     return chart
 
 
-def get_d6_chart(planets_raw, asc_deg):
+
+
+def get_d6_chart(astro_data):
+    def zodiac_index(z): return ZODIAC_SIGNS.index(z[:3])
+    asc_deg = to_float(astro_data["ascendant"]["degree"])
+    asc_sign, asc_d = get_sign_and_degree(asc_deg)
+
+    # Ascendant transformation
+    asc_shashtiamsa = int(asc_d * 2)
+    asc_d6_sign = (asc_sign + asc_shashtiamsa) if asc_sign % 2 == 0 else (asc_sign + (59 - asc_shashtiamsa))
+    asc_index = asc_d6_sign % 12
+
+    chart = {i: {"zodiac": "", "planets": []} for i in range(1, 13)}
+    for i in range(12):
+        chart[i + 1]["zodiac"] = ZODIAC_SIGNS[(asc_index + i) % 12] + f" ({(asc_index + i) % 12 + 1})"
+
+    for planet, pdata in astro_data["planets"].items():
+        abs_deg = to_float(pdata["degree"])
+        sign, deg = get_sign_and_degree(abs_deg)
+        shashtiamsa = int(deg * 2)
+        d6_sign = (sign + shashtiamsa) if sign % 2 == 0 else (sign + (59 - shashtiamsa))
+        house = ((d6_sign % 12 - asc_index + 12) % 12) + 1
+        chart[house]["planets"].append(PLANET_SHORT.get(planet, planet[:2]))
+
+    chart[1]["planets"].insert(0, "As")
+    return chart
+
+
+
+def get_d9_chart(astro_data):
+    def zodiac_index(z): return ZODIAC_SIGNS.index(z[:3])
+
+    RASHI_TYPE = {
+        0: "Movable", 1: "Fixed", 2: "Dual",
+        3: "Movable", 4: "Fixed", 5: "Dual",
+        6: "Movable", 7: "Fixed", 8: "Dual",
+        9: "Movable", 10: "Fixed", 11: "Dual"
+    }
+
+    def get_navamsa_sign(sign, deg):
+        navamsa_part = int(deg // 3.3333)
+        rtype = RASHI_TYPE[sign]
+        if rtype == "Movable":
+            start = sign
+        elif rtype == "Fixed":
+            start = (sign + 8) % 12  # 9th from sign
+        elif rtype == "Dual":
+            start = (sign + 4) % 12  # 5th from sign
+        else:
+            start = sign
+        return (start + navamsa_part) % 12
+
+    asc_deg = to_float(astro_data["ascendant"]["degree"])
+    asc_sign, asc_degree = get_sign_and_degree(asc_deg)
+    d9_asc_sign = get_navamsa_sign(asc_sign, asc_degree)
+
+    # ✅ Build Chart like D1
+    chart = {i: {"zodiac": "", "planets": []} for i in range(1, 13)}
+    for i in range(12):
+        chart[i + 1]["zodiac"] = ZODIAC_SIGNS[(d9_asc_sign + i) % 12] + f" ({(d9_asc_sign + i) % 12 + 1})"
+
+    for planet, pdata in astro_data["planets"].items():
+        abs_deg = to_float(pdata["degree"])
+        sign, deg = get_sign_and_degree(abs_deg)
+        d9_sign = get_navamsa_sign(sign, deg)
+        house = ((d9_sign - d9_asc_sign + 12) % 12) + 1
+        chart[house]["planets"].append(PLANET_SHORT.get(planet, planet[:2]))
+
+    chart[1]["planets"].insert(0, "As")
+    return chart
+
+
+
+
+
+
+
+
+def get_d10_chart(planets_raw, asc_deg):
     def transform(abs_deg):
         sign, deg = get_sign_and_degree(abs_deg)
-        is_even = (sign % 2 == 0)
-        shashtiamsa = int(deg * 2)
-        return ((sign + shashtiamsa) if is_even else (sign + (59 - shashtiamsa))) % 12 + 1
-
+        return (sign * 10 + int(deg // 3)) % 12
     return generic_chart(planets_raw, asc_deg, transform)
 
 
-def get_d9_chart(d1_planets_raw, d1_asc_deg):
-    def get_navamsa_start(sign):
-        return {0: 0, 4: 0, 8: 0, 1: 9, 5: 9, 9: 9, 2: 6, 6: 6, 10: 6}.get(sign, 3)
-
-    def navamsa_transform(abs_deg):
+def get_d12_chart(planets_raw, asc_deg):
+    def transform(abs_deg):
         sign, deg = get_sign_and_degree(abs_deg)
-        navamsa_idx = math.ceil((deg * 9) / 30)
-        return (get_navamsa_start(sign) + navamsa_idx - 1) % 12
-
-    asc_sign_index = navamsa_transform(to_float(d1_asc_deg))
-    chart = {}
-    for planet, abs_deg in d1_planets_raw.items():
-        if planet != 'Ascendant':
-            transformed = navamsa_transform(to_float(abs_deg))
-            house = ((transformed - asc_sign_index) % 12) + 1
-            chart[planet] = house
-    chart['Ascendant'] = 1
-    return rotate_chart(chart, asc_sign_index)
+        return (sign + int(deg * 12 / 30)) % 12
+    return generic_chart(planets_raw, asc_deg, transform)
 
 
-def get_d30_chart(d1_planets_raw, d1_asc_deg):
-    def trimsamsa_transform(abs_deg):
+def get_d16_chart(planets_raw, asc_deg):
+    def transform(abs_deg):
         sign, deg = get_sign_and_degree(abs_deg)
-        if sign % 2 == 0:  # Even
-            if deg <= 5:
-                return 0
-            elif deg <= 8:
-                return 1
-            elif deg <= 16:
-                return 2
-            elif deg <= 23:
-                return 3
-            elif deg <= 30:
-                return 4
-        else:  # Odd
-            if deg <= 5:
-                return 5
-            elif deg <= 7:
-                return 6
-            elif deg <= 15:
-                return 7
-            elif deg <= 22:
-                return 8
-            elif deg <= 30:
-                return 9
-
-    asc_sign_index = trimsamsa_transform(to_float(d1_asc_deg))
-    chart = {}
-    for planet, abs_deg in d1_planets_raw.items():
-        if planet != 'Ascendant':
-            transformed = trimsamsa_transform(to_float(abs_deg))
-            house = ((transformed - asc_sign_index) % 12) + 1
-            chart[planet] = house
-    chart['Ascendant'] = 1
-    return rotate_chart(chart, asc_sign_index)
+        return (sign * 16 + int(deg * 16 / 30)) % 12
+    return generic_chart(planets_raw, asc_deg, transform)
 
 
-def get_d60_chart(d1_planets_raw, d1_asc_deg):
-    def d60_shifted_sign(abs_deg):
+def get_d20_chart(planets_raw, asc_deg):
+    def transform(abs_deg):
+        sign, deg = get_sign_and_degree(abs_deg)
+        return (sign * 20 + int(deg * 20 / 30)) % 12
+    return generic_chart(planets_raw, asc_deg, transform)
+
+
+# def get_d24_chart(planets_raw, asc_deg):
+#     def transform(abs_deg):
+#         sign, deg = get_sign_and_degree(abs_deg)
+#         return (sign * 24 + int(deg * 24 / 30)) % 12
+#     return generic_chart(planets_raw, asc_deg, transform)
+
+
+def get_d30_chart(planets_raw, asc_deg):
+    def transform(abs_deg):
+        sign, deg = get_sign_and_degree(abs_deg)
+        if sign % 2 == 0:
+            return [0, 1, 2, 3, 4][[deg <= 5, deg <= 8, deg <= 16, deg <= 23, deg <= 30].index(True)]
+        else:
+            return [5, 6, 7, 8, 9][[deg <= 5, deg <= 7, deg <= 15, deg <= 22, deg <= 30].index(True)]
+    return generic_chart(planets_raw, asc_deg, transform)
+
+
+def get_d40_chart(planets_raw, asc_deg):
+    def transform(abs_deg):
+        sign, deg = get_sign_and_degree(abs_deg)
+        return (sign * 40 + int(deg * 40 / 30)) % 12
+    return generic_chart(planets_raw, asc_deg, transform)
+
+
+def get_d45_chart(planets_raw, asc_deg):
+    def transform(abs_deg):
+        sign, deg = get_sign_and_degree(abs_deg)
+        return (sign * 45 + int(deg * 45 / 30)) % 12
+    return generic_chart(planets_raw, asc_deg, transform)
+
+
+def get_d60_chart(planets_raw, asc_deg):
+    def transform(abs_deg):
         sign, deg = get_sign_and_degree(abs_deg)
         d60_index = int(deg * 2)
-        return (sign + (d60_index % 12 + 1) % 12) % 12
-
-    asc_sign_index = d60_shifted_sign(to_float(d1_asc_deg))
-    chart = {}
-    for planet, abs_deg in d1_planets_raw.items():
-        if planet != 'Ascendant':
-            transformed = d60_shifted_sign(to_float(abs_deg))
-            house = ((transformed - asc_sign_index) % 12) + 1
-            chart[planet] = house
-    chart['Ascendant'] = 1
-    return rotate_chart(chart, asc_sign_index)
+        return (sign + ((d60_index % 12 + 1) % 12)) % 12
+    return generic_chart(planets_raw, asc_deg, transform)
